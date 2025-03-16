@@ -29,6 +29,7 @@ Training happens locally and the experiment results are shared in an [MLflow por
 ### This repo builds on many foundations:
 
 * Allison Horst’s [Palmer Penguins repo](https://github.com/allisonhorst/palmerpenguins/blob/main/README.md) 
+    - Data downloaded 3/16/2025 ```curl -o data/penguins.csv https://raw.githubusercontent.com/allisonhorst/palmerpenguins/master/inst/extdata/penguins.csv```
 * Lynn Langit’s mentorship and amazing resources for [learning cloud](https://github.com/lynnlangit/learning-cloud) 
 * Santiago Valdarrama’s [ML School repo](https://github.com/svpino/ml.school)
 
