@@ -21,7 +21,7 @@ MLflow is used for model training and evaluation instead of notebooks.
 Training happens locally and the experiment results are shared in an [MLflow portfolio](https://hello-penguins-981081086626.us-central1.run.app/#/) that is hosted with Google Cloud Run. The goal is to have the portfolio highly available, but there may be times when it is offline.  The portfolio Docker container files are in the [docker-portfolio](/docker-portfolio/) directory. 
 
 ## Pre-Training Checks
-* Check the data for bias
+* Consider data [bias](/pretraining/bias.md)
 
 
 ## Acknowledgements and Sources
