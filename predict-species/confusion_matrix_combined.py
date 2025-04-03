@@ -5,6 +5,170 @@ from matplotlib.patches import Rectangle
 from matplotlib.colors import LinearSegmentedColormap
 
 
+class ClassificationMetrics:
+    """Class to calculate and store classification metrics based on a confusion matrix."""
+    
+    def __init__(self, confusion_matrix, class_labels=None):
+        """Initialize with a confusion matrix.
+        
+        Args:
+            confusion_matrix: The confusion matrix as a numpy array
+            class_labels: Optional list of class labels
+        """
+        self.cm = confusion_matrix
+        self.n_classes = confusion_matrix.shape[0]
+        self.class_labels = class_labels if class_labels is not None else [f"Class {i}" for i in range(self.n_classes)]
+        
+        # Calculate and store all metrics
+        self.metrics_by_class = self._calculate_all_metrics()
+        self.accuracy = self._calculate_accuracy()
+        self.overall_f1 = np.mean([m['F1'] for m in self.metrics_by_class])
+        self.total_samples = np.sum(self.cm)
+        self.correct_predictions = np.trace(self.cm)
+    
+    def _calculate_all_metrics(self):
+        """Calculate metrics for all classes.
+        
+        Returns:
+            List of dictionaries containing metrics for each class
+        """
+        metrics = []
+        for i in range(self.n_classes):
+            metrics.append(self._calculate_class_metrics(i))
+        return metrics
+    
+    def _calculate_class_metrics(self, class_idx):
+        """Calculate metrics for a specific class.
+        
+        Args:
+            class_idx: Index of the class
+            
+        Returns:
+            dict: Dictionary containing all metrics for the class
+        """
+        tp = self.cm[class_idx, class_idx]
+        actual_count = np.sum(self.cm[class_idx])
+        predicted_count = np.sum(self.cm[:, class_idx])
+        
+        recall = self.calculate_recall(class_idx)
+        precision = self.calculate_precision(class_idx)
+        f1 = self.calculate_f1(precision, recall)
+        
+        return {
+            'Species': self.class_labels[class_idx],
+            'TP': int(tp),
+            'Support': int(actual_count),
+            'PredictedTotal': int(predicted_count),
+            'Recall': recall,
+            'Precision': precision,
+            'F1': f1
+        }
+    
+    def calculate_recall(self, class_idx):
+        """Calculate recall for a specific class.
+        
+        Args:
+            class_idx: Index of the class
+            
+        Returns:
+            float: Recall value (0-1)
+        """
+        row_sum = np.sum(self.cm[class_idx])
+        if row_sum > 0:
+            return self.cm[class_idx, class_idx] / row_sum
+        return 0
+    
+    def calculate_precision(self, class_idx):
+        """Calculate precision for a specific class.
+        
+        Args:
+            class_idx: Index of the class
+            
+        Returns:
+            float: Precision value (0-1)
+        """
+        col_sum = np.sum(self.cm[:, class_idx])
+        if col_sum > 0:
+            return self.cm[class_idx, class_idx] / col_sum
+        return 0
+    
+    @staticmethod
+    def calculate_f1(precision, recall):
+        """Calculate F1 score given precision and recall.
+        
+        Args:
+            precision: Precision value (0-1)
+            recall: Recall value (0-1)
+            
+        Returns:
+            float: F1 score (0-1)
+        """
+        if precision + recall > 0:
+            return 2 * (precision * recall) / (precision + recall)
+        return 0
+    
+    def _calculate_accuracy(self):
+        """Calculate overall accuracy from confusion matrix.
+        
+        Returns:
+            float: Accuracy value (0-1)
+        """
+        return np.trace(self.cm) / np.sum(self.cm) if np.sum(self.cm) > 0 else 0
+    
+    def get_metrics_for_class(self, class_idx):
+        """Get metrics for a specific class.
+        
+        Args:
+            class_idx: Index of the class
+            
+        Returns:
+            dict: Dictionary containing metrics for the class
+        """
+        return self.metrics_by_class[class_idx]
+    
+    def get_formatted_metrics_for_class(self, class_idx):
+        """Get metrics with formatted percentage values for a specific class.
+        
+        Args:
+            class_idx: Index of the class
+            
+        Returns:
+            dict: Dictionary containing formatted metrics for the class
+        """
+        metrics = self.metrics_by_class[class_idx].copy()
+        metrics['Recall'] = f"{metrics['Recall']*100:.1f}%"
+        metrics['Precision'] = f"{metrics['Precision']*100:.1f}%"
+        metrics['F1'] = f"{metrics['F1']*100:.1f}%"
+        return metrics
+    
+    def get_overall_metrics(self):
+        """Get overall metrics for the confusion matrix.
+        
+        Returns:
+            dict: Dictionary containing overall metrics
+        """
+        return {
+            'Accuracy': self.accuracy,
+            'F1': self.overall_f1,
+            'TotalSamples': self.total_samples,
+            'CorrectPredictions': self.correct_predictions
+        }
+    
+    def get_formatted_overall_metrics(self):
+        """Get overall metrics with formatted percentage values.
+        
+        Returns:
+            dict: Dictionary containing formatted overall metrics
+        """
+        metrics = self.get_overall_metrics()
+        return {
+            'Accuracy': f"{metrics['Accuracy']*100:.1f}%",
+            'F1': f"{metrics['F1']*100:.1f}%",
+            'TotalSamples': metrics['TotalSamples'],
+            'CorrectPredictions': metrics['CorrectPredictions']
+        }
+
+
 def create_confusion_heatmap(cm, species_labels, ax=None, colormap='Blues'):
     """Create the confusion matrix heatmap visualization.
     
@@ -74,6 +238,7 @@ def create_confusion_heatmap(cm, species_labels, ax=None, colormap='Blues'):
     
     return fig, ax
 
+
 def create_metrics_table(cm, species_labels, ax=None):
     """Create a metrics summary table visualization.
     
@@ -95,55 +260,51 @@ def create_metrics_table(cm, species_labels, ax=None):
         fig = None
         ax.axis('off')
     
-    # Calculate total counts and metrics
-    row_sums = np.sum(cm, axis=1)  # Actual counts per class
-    col_sums = np.sum(cm, axis=0)  # Predicted counts per class
-    total_samples = np.sum(cm)     # Total samples
-    accuracy = np.trace(cm) / total_samples  # Overall accuracy
+    # Create metrics object and calculate all metrics
+    metrics_obj = ClassificationMetrics(cm, species_labels)
+    overall = metrics_obj.get_overall_metrics()
+    formatted_overall = metrics_obj.get_formatted_overall_metrics()
     
     # Prepare table data
     metrics_data = []
     metrics = []  # Store metrics for return
     headers = ['Species', 'Total\nActual', 'Total\nPredicted', 'Correctly\nClassified', 'Recall', 'Precision', 'F1']
     
+    # Add data for each class
     for i, species in enumerate(species_labels):
-        # Calculate metrics
-        tp = cm[i, i]  # True positive
-        recall = tp / row_sums[i] * 100 if row_sums[i] > 0 else 0
-        precision = tp / col_sums[i] * 100 if col_sums[i] > 0 else 0
-        f1 = 2 * (precision/100 * recall/100) / ((precision/100 + recall/100)) if (precision + recall) > 0 else 0
+        class_metrics = metrics_obj.get_metrics_for_class(i)
+        formatted_metrics = metrics_obj.get_formatted_metrics_for_class(i)
         
         # Store metrics for return
         metrics.append({
             'Species': species,
-            'Support': int(row_sums[i]),
-            'Recall': recall / 100,
-            'Precision': precision / 100,
-            'F1': f1 / 100
+            'Support': class_metrics['Support'],
+            'Recall': class_metrics['Recall'],
+            'Precision': class_metrics['Precision'],
+            'F1': class_metrics['F1']
         })
         
         # Add to table data
         metrics_data.append([
-            species,                  # Species name
-            f"{row_sums[i]}",         # Total actual instances
-            f"{col_sums[i]}",         # Total predicted instances
-            f"{tp}",                  # Correctly classified
-            f"{recall:.1f}%",         # Recall
-            f"{precision:.1f}%",       # Precision
-            f"{f1:.1f}%"       # F1
+            species,                                 # Species name
+            f"{class_metrics['Support']}",           # Total actual instances
+            f"{class_metrics['PredictedTotal']}",    # Total predicted instances
+            f"{class_metrics['TP']}",                # Correctly classified
+            formatted_metrics['Recall'],             # Recall
+            formatted_metrics['Precision'],          # Precision
+            formatted_metrics['F1']                  # F1
         ])
     
-    # Add overall row 
+    # Add overall row
     metrics_data.append([
         'Overall',
-        f"{total_samples}",
-        f"{total_samples}",
-        f"{np.trace(cm)}",
-        f"{accuracy * 100:.1f}%",
-        f"{accuracy * 100:.1f}%",
-        f"{f1 * 100:.1f}%"
+        f"{overall['TotalSamples']}",
+        f"{overall['TotalSamples']}",
+        f"{overall['CorrectPredictions']}",
+        formatted_overall['Accuracy'],
+        formatted_overall['Accuracy'],
+        formatted_overall['F1']
     ])
-    
     
     # Create table
     table = ax.table(
@@ -168,12 +329,13 @@ def create_metrics_table(cm, species_labels, ax=None):
         table[len(species_labels) + 1, j].set_facecolor("#f7fbff")
     
     # Add title and subtitle with sample count and accuracy
-    ax.set_title(f'Performance Metrics by Species\nTotal samples: {total_samples} | Overall accuracy: {accuracy:.1%}', 
-                 fontsize=12, pad=5, loc='left', y=0.75)
-    # ax.text(0.5, 0.90, f'Total samples: {total_samples} | Overall accuracy: {accuracy:.1%}',
-    #         ha='center', fontsize=10, style='italic')
+    ax.set_title(
+        f'Performance Metrics by Species\nTotal samples: {overall["TotalSamples"]} | Overall accuracy: {overall["Accuracy"]:.1%}', 
+        fontsize=12, pad=5, loc='left', y=0.75
+    )
     
     return fig, ax, metrics
+
 
 def create_combined_confusion_matrix(cm, species_labels, title, filename_prefix):
     """Create and save a combined confusion matrix visualization with metrics table.
