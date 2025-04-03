@@ -191,16 +191,6 @@ class BaselineModel(FlowSpec, DatasetMixin):
                     labels=self.model.classes_
             )
             
-            # Create and log confusion matrix
-            """ self.create_and_log_confusion_matrix_improved5(
-                cm=cm,
-                species_labels=self.model.classes_,
-                title='Baseline Model Confusion Matrix',
-                filename_prefix='baseline_model_confusion_matrix',
-                run_id=self.mlflow_run_id
-            )
- """
-            
             combined_path = create_combined_confusion_matrix(cm, self.model.classes_, "Baseline Model Performance", "baseline_confusion_matrix")
 
             # Log to MLflow
