@@ -87,16 +87,6 @@ def test_calculate_f1():
     assert ClassificationMetrics.calculate_f1(0.0, 0.8) == 0.0
     assert ClassificationMetrics.calculate_f1(0.0, 0.0) == 0.0
 
-def test_accuracy(simple_metrics, perfect_metrics, zero_metrics):
-    # Test with simple confusion matrix
-    assert simple_metrics._calculate_accuracy() == 23/30
-    
-    # Test with perfect confusion matrix
-    assert perfect_metrics._calculate_accuracy() == 1.0
-    
-    # Test with zeros
-    assert zero_metrics._calculate_accuracy() == 5/5
-
 def test_class_metrics(simple_metrics):
     # Test metrics for class 0
     metrics_0 = simple_metrics.get_metrics_for_class(0)

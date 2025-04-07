@@ -178,6 +178,10 @@ class BaselineModel(FlowSpec, DatasetMixin):
         mlflow.set_tracking_uri(self.mlflow_tracking_uri)
 
         # Let's log the training process under the current MLflow run.
+        # Set the run name for the existing run
+        mlflow.set_tracking_uri(self.mlflow_tracking_uri)
+        with mlflow.start_run(run_id=self.mlflow_run_id, nested=True):
+            mlflow.set_tag("mlflow.runName", "Baseline Training")
         with mlflow.start_run(run_id=self.mlflow_run_id):
             # We want to log the model manually, so let's disable automatic logging.
             mlflow.autolog(log_models=False)
