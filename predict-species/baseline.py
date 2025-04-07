@@ -169,13 +169,7 @@ class BaselineModel(FlowSpec, DatasetMixin):
         # Generate predictions
         y_pred = self.model.predict(self.x)
         y_pred_proba = self.model.predict_proba(self.x)
-        
-        # Calculate accuracy
-        self.test_accuracy = accuracy_score(self.data['species'], y_pred)
-      
-        logging.info(f"Baseline accuracy: {self.test_accuracy:.4f}")
             
-
         mlflow.set_tracking_uri(self.mlflow_tracking_uri)
 
         # Let's log the training process under the current MLflow run.
@@ -187,14 +181,12 @@ class BaselineModel(FlowSpec, DatasetMixin):
             # We want to log the model manually, so let's disable automatic logging.
             mlflow.autolog(log_models=False)
 
-            mlflow.log_metric("test_accuracy", self.test_accuracy)
-
-            metrics = ClassificationMetrics(y_true=self.data['species'],
+            self.metrics = ClassificationMetrics(y_true=self.data['species'],
                     y_pred=y_pred,
                     labels=self.model.classes_
                     )
             
-            combined_path = create_combined_confusion_matrix(metrics, "Baseline Model Performance", "baseline_confusion_matrix")
+            combined_path = create_combined_confusion_matrix(self.metrics, "Baseline Model Performance", "baseline_confusion_matrix")
 
             # Log to MLflow
             if self.mlflow_run_id:
@@ -202,7 +194,7 @@ class BaselineModel(FlowSpec, DatasetMixin):
                     mlflow.log_artifact(combined_path, "confusion_matrix")
                     mlflow.log_metrics(
                         {
-                            "accuracy": metrics.accuracy,
+                            "accuracy": self.metrics.accuracy,
                         },
                     )
             else:
@@ -255,7 +247,7 @@ class BaselineModel(FlowSpec, DatasetMixin):
 
         # We only want to register the model if its accuracy is above the
         # `accuracy_threshold` parameter.
-        if self.test_accuracy >= self.accuracy_threshold:
+        if self.metrics.accuracy >= self.accuracy_threshold:
             self.registered = True
             logging.info("Registering model...")
 
@@ -290,7 +282,7 @@ class BaselineModel(FlowSpec, DatasetMixin):
             logging.info(
                 "The accuracy of the model (%.2f) is lower than the accuracy threshold "
                 "(%.2f). Skipping model registration.",
-                self.test_accuracy,
+                self.metrics.accuracy,
                 self.accuracy_threshold,
             )
 
