@@ -3,15 +3,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.patches import Rectangle
 from matplotlib.colors import LinearSegmentedColormap
+from sklearn.metrics import confusion_matrix
 from metrics import ClassificationMetrics
 
 
-def create_confusion_heatmap(cm, species_labels, ax=None, colormap='Blues'):
+def create_confusion_heatmap(metrics_obj, ax=None, colormap='Blues'):
     """Create the confusion matrix heatmap visualization.
     
     Args:
-        cm: The confusion matrix array
-        species_labels: List of class labels
+        metrics_obj: ClassificationMetrics instance
         ax: Matplotlib axis to plot on (optional)
         colormap: Colormap to use for the heatmap
         
@@ -25,9 +25,13 @@ def create_confusion_heatmap(cm, species_labels, ax=None, colormap='Blues'):
     else:
         fig = None
     
+    # Get confusion matrix and class labels
+    cm = metrics_obj.get_confusion_matrix()
+    species_labels = metrics_obj.class_labels
+    
     # Calculate row percentages (recall perspective)
     cm_sum_rows = np.sum(cm, axis=1, keepdims=True)
-    cm_perc_recall = cm / cm_sum_rows * 100
+    cm_perc_recall = np.divide(cm, cm_sum_rows, out=np.zeros_like(cm, dtype=float), where=cm_sum_rows!=0) * 100
     
     # Create annotation with both counts and percentages
     annot = np.empty_like(cm).astype(str)
@@ -63,10 +67,12 @@ def create_confusion_heatmap(cm, species_labels, ax=None, colormap='Blues'):
     
     # Add custom hatching to highlight the highest value in each row
     for i in range(len(species_labels)):
-        max_idx = np.argmax(cm[i])
-        if max_idx != i:  # If the maximum is not on the diagonal
-            # Add red border to highlight misclassification tendency
-            ax.add_patch(Rectangle((max_idx, i), 1, 1, fill=False, edgecolor='#f47b26', lw=4, linestyle=':'))
+        row = cm[i]
+        if np.sum(row) > 0:  # Only check non-empty rows
+            max_idx = np.argmax(row)
+            if max_idx != i:  # If the maximum is not on the diagonal
+                # Add red border to highlight misclassification tendency
+                ax.add_patch(Rectangle((max_idx, i), 1, 1, fill=False, edgecolor='#f47b26', lw=4, linestyle=':'))
 
     # Set labels
     ax.set_title('Confusion Matrix: Class Count and Class Recall\n', fontsize=12, pad=10, loc='left')
@@ -76,12 +82,11 @@ def create_confusion_heatmap(cm, species_labels, ax=None, colormap='Blues'):
     return fig, ax
 
 
-def create_metrics_table(cm, species_labels, ax=None):
+def create_metrics_table(metrics_obj, ax=None):
     """Create a metrics summary table visualization.
     
     Args:
-        cm: The confusion matrix array
-        species_labels: List of class labels
+        metrics_obj: ClassificationMetrics instance
         ax: Matplotlib axis to plot on (optional)
         
     Returns:
@@ -97,10 +102,10 @@ def create_metrics_table(cm, species_labels, ax=None):
         fig = None
         ax.axis('off')
     
-    # Create metrics object and calculate all metrics
-    metrics_obj = ClassificationMetrics(cm, species_labels)
+    # Get metrics
     overall = metrics_obj.get_overall_metrics()
     formatted_overall = metrics_obj.get_formatted_overall_metrics()
+    species_labels = metrics_obj.class_labels
     
     # Prepare table data
     metrics_data = []
@@ -108,13 +113,13 @@ def create_metrics_table(cm, species_labels, ax=None):
     headers = ['Species', 'Total\nActual', 'Total\nPredicted', 'Correctly\nClassified', 'Recall', 'Precision', 'F1']
     
     # Add data for each class
-    for i, species in enumerate(species_labels):
+    for i in range(len(species_labels)):
         class_metrics = metrics_obj.get_metrics_for_class(i)
         formatted_metrics = metrics_obj.get_formatted_metrics_for_class(i)
         
         # Store metrics for return
         metrics.append({
-            'Species': species,
+            'Species': species_labels[i],
             'Support': class_metrics['Support'],
             'Recall': class_metrics['Recall'],
             'Precision': class_metrics['Precision'],
@@ -123,7 +128,7 @@ def create_metrics_table(cm, species_labels, ax=None):
         
         # Add to table data
         metrics_data.append([
-            species,                                 # Species name
+            species_labels[i],                       # Species name
             f"{class_metrics['Support']}",           # Total actual instances
             f"{class_metrics['PredictedTotal']}",    # Total predicted instances
             f"{class_metrics['TP']}",                # Correctly classified
@@ -174,20 +179,20 @@ def create_metrics_table(cm, species_labels, ax=None):
     return fig, ax, metrics
 
 
-def create_combined_confusion_matrix(cm, species_labels, title, filename_prefix):
+def create_combined_confusion_matrix(metrics_obj, title, filename_prefix=None):
     """Create and save a combined confusion matrix visualization with metrics table.
     
     This function creates a comprehensive visualization with both a
     confusion matrix heatmap and a metrics summary table.
     
     Args:
-        cm: The confusion matrix array
-        species_labels: List of class labels
+        metrics_obj: ClassificationMetrics instance
         title: Overall title for the visualization
-        filename_prefix: Prefix for the saved file
+        filename_prefix: Prefix for the saved file (optional)
         
     Returns:
-        cm_path: Path to the saved visualization
+        If filename_prefix is provided: Path to the saved visualization
+        If filename_prefix is None: (fig, (ax_heatmap, ax_metrics)) tuple
     """
     # Create a figure with stacked subplots (heatmap on top, metrics table below)
     fig, (ax_heatmap, ax_metrics) = plt.subplots(
@@ -197,10 +202,10 @@ def create_combined_confusion_matrix(cm, species_labels, title, filename_prefix)
     )
     
     # Create the heatmap
-    create_confusion_heatmap(cm, species_labels, ax=ax_heatmap)
+    create_confusion_heatmap(metrics_obj, ax=ax_heatmap)
     
     # Create the metrics table
-    create_metrics_table(cm, species_labels, ax=ax_metrics)
+    create_metrics_table(metrics_obj, ax=ax_metrics)
     
     # Add overall title to the figure
     plt.suptitle(title, fontsize=14, y=0.98)
@@ -208,9 +213,12 @@ def create_combined_confusion_matrix(cm, species_labels, title, filename_prefix)
     # Use tight_layout with padding to ensure no overlap
     plt.tight_layout(rect=[0, 0, 1, 0.95], h_pad=2.0)
     
-    # Save the visualization
-    cm_path = f'{filename_prefix}.png'
-    plt.savefig(cm_path, dpi=300, bbox_inches='tight')
-    plt.close()
+    # If filename_prefix is provided, save the visualization and return path
+    if filename_prefix:
+        cm_path = f'{filename_prefix}.png'
+        plt.savefig(cm_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        return cm_path
     
-    return cm_path
+    # Otherwise return the figure and axes for further customization
+    return fig, (ax_heatmap, ax_metrics)

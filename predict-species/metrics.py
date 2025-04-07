@@ -10,46 +10,42 @@ from sklearn.metrics import (
 )
 
 class ClassificationMetrics:
-    """Class to calculate and store classification metrics based on a confusion matrix."""
+    """Class to calculate and store classification metrics based on true and predicted labels."""
     
-    def __init__(self, confusion_matrix, class_labels=None):
-        """Initialize with a confusion matrix.
+    def __init__(self, y_true, y_pred, labels=None, class_labels=None):
+        """Initialize with prediction data.
         
         Args:
-            confusion_matrix: The confusion matrix as a numpy array
-            class_labels: Optional list of class labels
+            y_true: Array of true class labels
+            y_pred: Array of predicted class labels
+            labels: List of possible class labels (optional)
+            class_labels: Optional list of descriptive class labels for display
         """
-        self.cm = confusion_matrix
-        self.n_classes = confusion_matrix.shape[0]
-        self.class_labels = class_labels if class_labels is not None else [f"Class {i}" for i in range(self.n_classes)]
+        self.y_true = np.array(y_true)
+        self.y_pred = np.array(y_pred)
         
-        # Create the true and predicted labels arrays from the confusion matrix
-        self.y_true, self.y_pred = self._confusion_matrix_to_labels()
+        # Determine labels from the data if not provided
+        if labels is not None:
+            self.label_set = np.array(labels)
+        else:
+            self.label_set = np.unique(np.concatenate([self.y_true, self.y_pred]))
         
+        # Create the confusion matrix
+        self.cm = sk_confusion_matrix(self.y_true, self.y_pred, labels=self.label_set)
+        self.n_classes = len(self.label_set)
+        
+        # Set display labels
+        if class_labels is not None:
+            self.class_labels = class_labels
+        else:
+            self.class_labels = [str(label) for label in self.label_set]
+            
         # Calculate and store all metrics
         self.metrics_by_class = self._calculate_all_metrics()
         self.accuracy = accuracy_score(self.y_true, self.y_pred)
-        self.overall_f1 = f1_score(self.y_true, self.y_pred, average='macro')
+        self.overall_f1 = f1_score(self.y_true, self.y_pred, average='macro', zero_division=0)
         self.total_samples = len(self.y_true)
         self.correct_predictions = np.sum(self.y_true == self.y_pred)
-    
-    def _confusion_matrix_to_labels(self):
-        """Convert confusion matrix to true and predicted label arrays.
-        
-        Returns:
-            tuple: (y_true, y_pred) arrays
-        """
-        y_true = []
-        y_pred = []
-        
-        # Iterate through the confusion matrix and create label arrays
-        for i in range(self.n_classes):
-            for j in range(self.n_classes):
-                count = int(self.cm[i, j])
-                y_true.extend([i] * count)
-                y_pred.extend([j] * count)
-        
-        return np.array(y_true), np.array(y_pred)
     
     def _calculate_all_metrics(self):
         """Calculate metrics for all classes using scikit-learn.
@@ -59,17 +55,24 @@ class ClassificationMetrics:
         """
         # Calculate precision, recall, f1, and support for each class
         precision, recall, f1, support = precision_recall_fscore_support(
-            self.y_true, self.y_pred, labels=range(self.n_classes), average=None
+            self.y_true, self.y_pred, 
+            labels=self.label_set, 
+            average=None,
+            zero_division=0
         )
         
         metrics = []
-        for i in range(self.n_classes):
+        for i, label in enumerate(self.label_set):
+            # Get the index in the confusion matrix corresponding to this label
+            cm_idx = i  # Since we ordered the confusion matrix using labels
+            
             # Calculate true positives for each class
-            tp = self.cm[i, i]
-            predicted_total = np.sum(self.cm[:, i])
+            tp = self.cm[cm_idx, cm_idx]
+            predicted_total = np.sum(self.cm[:, cm_idx])
             
             metrics.append({
                 'Species': self.class_labels[i],
+                'Label': label,
                 'TP': int(tp),
                 'Support': int(support[i]),
                 'PredictedTotal': int(predicted_total),
@@ -80,66 +83,11 @@ class ClassificationMetrics:
         
         return metrics
     
-    def calculate_recall(self, class_idx):
-        """Calculate recall for a specific class using scikit-learn.
-        
-        Args:
-            class_idx: Index of the class
-            
-        Returns:
-            float: Recall value (0-1)
-        """
-        class_mask = (self.y_true == class_idx)
-        if np.sum(class_mask) == 0:
-            return 0
-        return recall_score(
-            self.y_true[class_mask], 
-            self.y_pred[class_mask], 
-            labels=[class_idx], 
-            average='micro',
-            zero_division=0
-        )
-    
-    def calculate_precision(self, class_idx):
-        """Calculate precision for a specific class using scikit-learn.
-        
-        Args:
-            class_idx: Index of the class
-            
-        Returns:
-            float: Precision value (0-1)
-        """
-        pred_mask = (self.y_pred == class_idx)
-        if np.sum(pred_mask) == 0:
-            return 0
-        return precision_score(
-            self.y_true[pred_mask], 
-            self.y_pred[pred_mask], 
-            labels=[class_idx], 
-            average='micro',
-            zero_division=0
-        )
-    
-    @staticmethod
-    def calculate_f1(precision, recall):
-        """Calculate F1 score given precision and recall.
-        
-        Args:
-            precision: Precision value (0-1)
-            recall: Recall value (0-1)
-            
-        Returns:
-            float: F1 score (0-1)
-        """
-        if precision + recall > 0:
-            return 2 * (precision * recall) / (precision + recall)
-        return 0
-    
     def get_metrics_for_class(self, class_idx):
         """Get metrics for a specific class.
         
         Args:
-            class_idx: Index of the class
+            class_idx: Index of the class in the label_set
             
         Returns:
             dict: Dictionary containing metrics for the class
@@ -150,7 +98,7 @@ class ClassificationMetrics:
         """Get metrics with formatted percentage values for a specific class.
         
         Args:
-            class_idx: Index of the class
+            class_idx: Index of the class in the label_set
             
         Returns:
             dict: Dictionary containing formatted metrics for the class
@@ -162,7 +110,7 @@ class ClassificationMetrics:
         return metrics
     
     def get_overall_metrics(self):
-        """Get overall metrics for the confusion matrix.
+        """Get overall metrics for the predictions.
         
         Returns:
             dict: Dictionary containing overall metrics
@@ -200,7 +148,16 @@ class ClassificationMetrics:
         return classification_report(
             self.y_true, 
             self.y_pred, 
-            labels=range(self.n_classes),
+            labels=self.label_set,
             target_names=self.class_labels,
-            output_dict=output_dict
+            output_dict=output_dict,
+            zero_division=0
         )
+    
+    def get_confusion_matrix(self):
+        """Get the confusion matrix.
+        
+        Returns:
+            numpy.ndarray: The confusion matrix
+        """
+        return self.cm

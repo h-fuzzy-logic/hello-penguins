@@ -2,6 +2,7 @@ import logging
 import os
 from pathlib import Path
 #from confusion_matrix import create_combined_visualization
+from metrics import ClassificationMetrics
 from confusion_matrix_combined import create_combined_confusion_matrix
 import numpy as np
 import seaborn as sns
@@ -181,26 +182,29 @@ class BaselineModel(FlowSpec, DatasetMixin):
         # Set the run name for the existing run
         mlflow.set_tracking_uri(self.mlflow_tracking_uri)
         with mlflow.start_run(run_id=self.mlflow_run_id, nested=True):
-            mlflow.set_tag("mlflow.runName", "Baseline Training")
+            mlflow.set_tag("mlflow.runName", "Baseline")
         with mlflow.start_run(run_id=self.mlflow_run_id):
             # We want to log the model manually, so let's disable automatic logging.
             mlflow.autolog(log_models=False)
 
             mlflow.log_metric("test_accuracy", self.test_accuracy)
 
-            # Calculate confusion matrix
-            cm = confusion_matrix(
-                    y_true=self.data['species'],
+            metrics = ClassificationMetrics(y_true=self.data['species'],
                     y_pred=y_pred,
                     labels=self.model.classes_
-            )
+                    )
             
-            combined_path = create_combined_confusion_matrix(cm, self.model.classes_, "Baseline Model Performance", "baseline_confusion_matrix")
+            combined_path = create_combined_confusion_matrix(metrics, "Baseline Model Performance", "baseline_confusion_matrix")
 
             # Log to MLflow
             if self.mlflow_run_id:
                 with mlflow.start_run(run_id=self.mlflow_run_id, nested=True):
                     mlflow.log_artifact(combined_path, "confusion_matrix")
+                    mlflow.log_metrics(
+                        {
+                            "accuracy": metrics.accuracy,
+                        },
+                    )
             else:
                 mlflow.log_artifact(combined_path, "confusion_matrix")
     
