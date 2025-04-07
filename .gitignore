@@ -28,6 +28,14 @@ MANIFEST
 
 # Misc
 .DS_Store
+.ipynb_checkpoints
+.metaflow/
+metaflow_card_cache/
+metaflow.s3.**/
+mlruns/
+mlartifacts/
+mlflow.db
+uv.lock
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
