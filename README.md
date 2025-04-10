@@ -11,11 +11,13 @@
 ## Welcome
 Welcome to the “Hello Penguins” repository, a collection of machine learning experiments with the Palmer Penguins dataset. 
 
-Following the “Hello, World!” programming tradition, each experiment includes sanity checks to verify the model predictions make sense and are explainable.
+Inspired by the “Hello, World!” programming tradition, this repository is a series of small experiments to illustrate foundational machine learning concepts. Each experiment includes evaluation metrics and visuals to verify the model predictions make sense and are explainable.
+
+Software engineering concepts are used to ensure the code is testable and reproducible.
 
 To learn more about the dataset, checkout the the official [Palmer Penguins GitHub repo](https://github.com/allisonhorst/palmerpenguins/blob/main/README.md).
 
-## Technology 
+## Training Approach and Technology 
 MLflow is used for model training and evaluation instead of notebooks. 
 
 Training happens locally and the experiment results are shared in an [MLflow portfolio](https://hello-penguins-981081086626.us-central1.run.app/#/) that is hosted with Google Cloud Run. The goal is to have the portfolio highly available, but there may be times when it is offline.  The portfolio Docker container files are in the [docker-portfolio](/docker-portfolio/) directory. 
